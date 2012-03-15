@@ -8,24 +8,117 @@
 	<!--<script src="http://code.jquery.com/mobile/1.1.0-rc.1/jquery.mobile-1.1.0-rc.1.min.js"></script>-->
   <script src="./lib/jquery.mobile-1.0.1.js"></script>
   
-  <script id="place-template" language="x-mustache">    
-    <h3>
-      {{name}} 
-      {{#type}} 
-        ({{type}}) 
-      {{/type}}
-    </h3>
-    <p>
-      {{#address}}
-        {{housenumber}}
-        {{street}}
-      {{/address}}
+  <script id="place-page-template" type="text/template">
+ 
+    <div id="place-page" data-role="page">
+      <div data-role="header">
+        <h1>Check-in: {{name}}</h1>
+      </div>
+
+      <div data-role="content">
+        <p>
+          {{#address}}
+            {{housenumber}}
+            {{street}}
+          {{/address}}
+        
+          {{#taglistString}}
+            {{taglistString}}
+          {{/taglistString}}
+        </p>  
+        
+        <form id='form-{{node_id}}'>
+            <input id="status" type="text" placeholder="say something!" value="Here!" name="status"/>
+            <button type="submit" data-node-id='{{node_id}}'>Check-in</button>
+        </form>    
+      </div><!-- /content -->
+    </div>
     
-      {{#taglistString}}
-        {{taglistString}}
-      {{/taglistString}}
-    </p>
+    <div data-role="footer">
+      <h5>      
+        A CityGoer.com project. 
+        <br/>
+        Find out more at <a href='http://github.com/cuppster/citygoer'>http://github.com/cuppster/citygoer<a/>
+        <br/>
+        Xapi Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">
+        <br/>
+        Map data (c) <a href='http://www.openstreetmap.org/'>OpenStreetMap</a> contributors, <a href='http://creativecommons.org/licenses/by-sa/2.0/'>CC-BY-SA</a>      
+      </h5>
+    </div><!-- /footer -->
+    
   </script>
+  
+ <script id="here-template" type="text/template">   
+
+  
+    <h3>
+    
+      {{#status}}
+        "{{status}}" 
+        
+      {{/status}}
+    
+      @
+      
+      {{#name}} 
+        {{name}}       
+      {{/name}} 
+      
+      /
+      
+      {{relwhen}}
+ 
+    </h3>
+    
+
+  </script>
+  
+  <script id="place-template" type="text/template">   
+
+    <a href='#' data-node-id='{{node_id}}'>
+      <h3>
+      
+        {{#status}}
+          "{{status}}" 
+          @
+        {{/status}}
+      
+        {{#name}} 
+          {{name}} 
+          
+          {{#type}} 
+            ({{type}}) 
+          {{/type}}        
+        {{/name}} 
+   
+        {{^name}} 
+          {{type}}      
+        {{/name}}
+        
+      </h3>
+      <p>
+        {{#address}}
+          {{housenumber}}
+          {{street}}
+        {{/address}}
+      
+        {{#taglistString}}
+          {{taglistString}}
+        {{/taglistString}}
+      </p>
+      
+      <!--<span class="ui-li-count">{{headCount}}</span>-->
+    </a>
+    <!--<a href="#" title='stomp' data-rel="dialog" data-transition="slideup">Here</a>-->
+    
+
+  </script>
+  
+  <style>
+    xinput[type='text'] {
+      width: 100%
+    }
+  </style>
     
 </head> 
 <body> 
@@ -33,16 +126,73 @@
   <div id="places" data-role="page">
 
     <div data-role="header">
-      <h1>Citygoer</h1>
+      <h1>Citygoer Places</h1>
     </div><!-- /header -->
+    
+    <div data-role="navbar">
+      <ul>
+        <li><a href="#places" class="ui-btn-active ui-state-persist">Places</a></li>
+        <li><a href="#follow">Follow</a></li>
+      </ul>
+    </div><!-- /navbar -->
 
     <div data-role="content" >	
-      <ul id="places-list" data-role="listview">
-      </ul>
+      <ul id="places-list" data-role="listview" data-inset="false">
+      </ul>      
     </div><!-- /content -->
-
+    
+    <div data-role="footer">
+      <h5>      
+        A CityGoer.com project. 
+        <br/>
+        Find out more at <a href='http://github.com/cuppster/citygoer'>http://github.com/cuppster/citygoer<a/>
+        <br/>
+        Xapi Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">
+        <br/>
+        Map data (c) <a href='http://www.openstreetmap.org/'>OpenStreetMap</a> contributors, <a href='http://creativecommons.org/licenses/by-sa/2.0/'>CC-BY-SA</a>      
+      </h5>
+    </div><!-- /footer -->
+    
   </div><!-- /page -->
+  
+  <!-- places page -->
+  <div id="place-page" data-role="page">
+   
+  </div>
 
+  <!-- follow page -->
+  <div id="follow" data-role="page">
+
+    <div data-role="header">
+      <h1>Citygoer Follow</h1>
+    </div><!-- /header -->
+
+    <div data-role="navbar">
+      <ul>
+        <li><a href="#places">Places</a></li>
+        <li><a href="#follow" class="ui-btn-active ui-state-persist">Follow</a></li>
+      </ul>
+    </div><!-- /navbar -->
+    
+    <div data-role="content" >	
+      <ul id="follow-list" data-role="listview" data-inset="false">
+      </ul>      
+    </div><!-- /content -->
+ 
+    <div data-role="footer">
+      <h5>      
+        A CityGoer.com project. 
+        <br/>
+        Find out more at <a href='http://github.com/cuppster/citygoer'>http://github.com/cuppster/citygoer<a/>
+        <br/>
+        Xapi Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">
+        <br/>
+        Map data (c) <a href='http://www.openstreetmap.org/'>OpenStreetMap</a> contributors, <a href='http://creativecommons.org/licenses/by-sa/2.0/'>CC-BY-SA</a>      
+      </h5>
+    </div><!-- /footer -->  
+  </div><!-- /page -->
+  
+  <!-- error dialog -->
   <div id="errorPage" data-role="dialog">
     <div data-role="content" data-theme="a">
       <h3>There's been an error!</h3>		 		  

@@ -7,28 +7,31 @@ var
   Log         = require('log'),
   log         = new Log(),
   express     = require('express'),
+  Redis       = require('redis'),
   program     = require('commander');
   
 // ## setup cli
 //
 program
   .version('0.0.1')
-  .option('-p, --port <n>', 'Start server on this port number', 8126)
+  .option('-p, --port <n>', 'Start server on this port number', 8133)
   .parse(process.argv);
   
 log.info("starting server on port : " + program.port);
 
-
 // ## setup app
 //
 var app = express.createServer();
+
+// ## add redis and give to app
+var redis = Redis.createClient();
+app.redis = redis;
 
 // ## middleware
 //
 log.info('adding commmon middleware...');
 app.use(express.bodyParser());
 app.use(express.methodOverride());
-
 
 // ## CORS middleware
 // 
@@ -46,24 +49,19 @@ var allowCrossDomain = function(req, res, next) {
       next();
     }
 };
-
 app.use(allowCrossDomain);
 
 // ## setup routes
 //
-
 var placesResource = require('./places');
 
-app.get('/stuff',         placesResource.stuff);
-
-
-
+// ### api methods
+//
+app.get   ('/near',         placesResource.near);
+app.post  ('/here',         placesResource.createHere);
+app.get   ('/follow',       placesResource.follow);
 
 // ## start listening
 //
 app.listen(program.port);
-log.info("server ready on port: " + program.port);
-
-
-
-
+log.info("server ready on port: %s", program.port);

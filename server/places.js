@@ -26,36 +26,147 @@ var
   Log       = require('log'),
   log       = new Log(),
   _         = require('underscore'),
+  moment    = require('moment'),
   Places    = exports;
   
   
- Places.stuff = function(req, res, next) {
- 
-  log.debug('Places.stuff');
+// ## magic numbers
+//
+var ONE_DAY_S = 60 * 60 * 24;
+var ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+// ## Follow
+Places.follow = function(req, res, next) {
+
+  var redis = req.app.redis;
   
+  var max = Date.now();
+  var min = max - ( ONE_DAY_MS );
+  
+  log.debug('min = %s, max = %s', min ,max);
+  
+  redis
+  
+    //.multi()
+  
+    .zrevrangebyscore('here', max, min, "WITHSCORES", function(err, reply) {
+   
+      log.debug('raw %s', reply);
+    //.exec(function(err, reply) {
+    
+      if (err) {
+        log.error(err);
+        res.send(500);
+      }
+      else {
+        
+        var follow = [];
+        if (reply && 0 < reply.length)
+          follow = JSON.parse('[' + reply + ']');
+          
+        if (0 < follow.length) {
+        
+          var updatedFollow = [];
+          
+          _.each( _.range(0, follow.length, 2), function (i) {
+          
+            var data = follow[i];
+            var timestamp = follow[i+1];
+            
+            var date = moment(new Date(timestamp));
+            data.when = date.format("LLLL");
+            
+            var reltime = date.from(moment());
+            data.relwhen = reltime;
+            
+            updatedFollow.push(data);
+          });
+          
+          follow = updatedFollow;
+          
+        
+        }
+          
+        sendJSON(req, res, follow);
+        
+      }
+    });
+
+  
+  //sendJSON(req, res, [ {name: "The Green Turtle Sports Bar & Grill"}]);
+
+}
+
+
+//
+// ## Here
+//
+Places.createHere = function(req, res, next) {
+
+  var redis = req.app.redis;
+  
+  log.debug('Places.HERE');
+
   // location
-  var top = parseFloat(req.param('lat')) || 36.175;
-  var left = parseFloat(req.param('lon')) ||  -115.136389;
+  var node_id     = req.param('node_id');
+  var name        = req.param('name');
+  var lat         = parseFloat(req.param('lat')) || 36.175;
+  var lon         = parseFloat(req.param('lon')) ||  -115.136389;
+
+  // status
+  var status = req.param('status');
+  log.debug('status = %s', status);
   
+  var nodekey = 'node:' + node_id;
+  
+  redis.multi()
+    .hmset(nodekey, { name: name, lat: lat, lon:lon })
+    .expire(nodekey, ONE_DAY_S)
+    .zadd('here', Date.now(), JSON.stringify({status: status, name: name, node_id: node_id}))
+    //.zremrangebyscore(...)
+    .exec(function(err, reply) {
+    
+      log.debug('inserted %s', status);
+      sendJSON(req, res, "OK");
+      
+    });
+}
+ 
+// ## Near 
+//
+Places.near = function(req, res, next) {
+
+  log.debug('Places.near');
+
+  // location
+  var lat = parseFloat(req.param('lat')) || 36.175;
+  var lon = parseFloat(req.param('lon')) ||  -115.136389;
+
   // type
   var placeType = req.param('type') || "*";
-  
-  var bottom = top - 0.02;
-  var right = left + 0.04;
-  
-  // [bbox=left,bottom,right,top]
+
+  var topLeft   = destinationPoint(lat, lon, -45, 1);
+  var botRight  = destinationPoint(lat, lon, 135, 1);
+
+  var top       = topLeft[0];
+  var left      = topLeft[1];
+  var bottom    = botRight[0];
+  var right     = botRight[1];  
+
+  log.debug("top = %s, left = %s, bottom = %s, right = %s", top, left, bottom, right);
+
+  // [amenity={type}][bbox={left},{bottom},{right},{top}]
   //var url = "http://open.mapquestapi.com/xapi/api/0.6/node[amenity=pub][bbox=-77.041579,38.885851,-77.007247,38.900881]";
   var url = "http://open.mapquestapi.com/xapi/api/0.6/node[amenity=%type][bbox=%left,%bottom,%right,%top]";
-  
+
   url = url.replace('%top', top);
   url = url.replace('%bottom', bottom);
   url = url.replace('%right', right);
-  url = url.replace('%left', left);
-  
+  url = url.replace('%left', left);  
   url = url.replace('%type', placeType);
-  
+
   log.debug("url = %s", url);
-  
+
   //fs.readFile(__dirname + '/responses/xapi1.xml', function(err, data) {
   request(url, function (err, response, data) {
     if (err) {
@@ -64,7 +175,7 @@ var
     }
     else {
     
-      log.debug(data);
+      // log.debug(data);
       
       var parser = new xml2js.Parser({explicitArray: true});
       parser.parseString(data, function (err, result) {      
@@ -80,11 +191,19 @@ var
             var rec = {};
             rec.lat = item['@'].lat;
             rec.lon = item['@'].lon;
+            
+            // node id
+            var node_id = item['@'].id;            
+            rec.node_id  = node_id;
+            
+            // how many people are here?
+            rec.headCount = Math.floor(Math.random() * 12); 
            
             // tags
             var tags = {};
             var taglist = [];
             var address = {};
+            
             _.each(item.tag, function(tag) {    
                
               var key = tag['@'].k;
@@ -124,7 +243,7 @@ var
                     tags[key] = val;
                     taglist.push(val);
                   }
-              
+                  break;
               }
             
             });
@@ -132,8 +251,7 @@ var
             // assign data
             rec.tags      = tags;            
             rec.taglist   = taglist;
-            rec.address   = address;
-          
+            rec.address   = address;          
             return rec;
           });
         
@@ -142,7 +260,7 @@ var
       });
     }
   }) 
- }
+}
  
  
  
@@ -188,18 +306,30 @@ var sendJSON = function(req, res, data, view) {
     else {      
       out = JSON.stringify(data);
       mime = MIME_JSON;
-    }
+    }    
     
-    
+    // output to client
     res.charset = 'utf-8';
     res.header('Content-Type', mime);    
     res.send(out);
     
-    //
-    //res.writeHead(200, {
-    //  'Content-Length'  : out.length,
-    //  'Content-Type'    : mime,
-    //});
-    //res.end(out); 
   }
+}
+
+// ## find another lat,lon some distance away
+//
+// see: http://www.movable-type.co.uk/scripts/latlong.html
+//
+function destinationPoint(lat, lon, brng, dist) {
+  dist = dist/6371;  // convert dist to angular distance in radians, earth's mean radius in km
+  brng = brng * Math.PI / 180;
+  var lat1 = lat * Math.PI / 180;
+  var lon1 = lon * Math.PI / 180;
+  var lat2 = Math.asin( Math.sin(lat1)*Math.cos(dist) + 
+      Math.cos(lat1)*Math.sin(dist)*Math.cos(brng) );
+  var lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(dist)*Math.cos(lat1), 
+      Math.cos(dist)-Math.sin(lat1)*Math.sin(lat2));
+  lon2 = (lon2+3*Math.PI)%(2*Math.PI) - Math.PI;  // normalise to -180...+180
+  if (isNaN(lat2) || isNaN(lon2)) return null;
+  return [lat2 / Math.PI * 180, lon2 / Math.PI * 180];
 }
